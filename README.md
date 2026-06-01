@@ -1,2 +1,715 @@
-# National-and-international-tourism-planning-system-
+ National-and-international-tourism-planning-system-
 The code is made with the concepts of OOP in Cpp whereas we planned a national and international trip 
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <iomanip>
+#include <conio.h>
+#include <vector>
+#include <windows.h> 
+
+using namespace std;
+
+// Screen par rang (colors) badalne ke liye function
+void setColor(int color) {
+    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+}
+
+// Text ko center (darmiyan) mein print karne ke liye function
+void printMid(string s) {
+    int spaces = (80 - (int)s.length()) / 2;
+    if (spaces < 0) spaces = 0;
+    for (int i = 0; i < spaces; i++) cout << " ";
+    cout << s << endl;
+}
+
+// Yeh check karne ke liye ke input mein sirf numbers hain ya nahi
+bool isOnlyDigits(string s) {
+    if(s.empty()) return false;
+    for (char const &ch : s) if (!isdigit(ch)) return false;
+    return true;
+}
+
+// Purana record check karne ke liye ke ID duplicate to nahi
+bool checkDuplicateID(string id) {
+    ifstream file("tourist_database.txt");
+    string line;
+    while (getline(file, line)) {
+        if (line.find("ID: " + id + " |") != string::npos) {
+            file.close();
+            return true;
+        }
+    }
+    file.close();
+    return false;
+}
+
+// ---------------------------------------------------------
+// BASE CLASS (PERSON)
+// ---------------------------------------------------------
+class Person {
+public:
+    string name, cnic, phone, address;
+    Person() {}
+    Person(string n, string c, string p, string a) : name(n), cnic(c), phone(p), address(a) {}
+    virtual ~Person() {} 
+};
+
+// DERIVED CLASS (DRIVER WITH CONDUCTOR DETAILS)
+class Driver : public Person {
+public:
+    string vehicleNo, license, rating;
+    string conductorName, conductorPhone; 
+
+    Driver() : Person() {}
+    Driver(string n, string c, string p, string v, string l, string r, string a, string condName, string condPhone) 
+        : Person(n, c, p, a), vehicleNo(v), license(l), rating(r), conductorName(condName), conductorPhone(condPhone) {}
+    ~Driver() {} 
+};
+
+// ---------------------------------------------------------
+// POLYMORPHISM (BILLING CORES)
+// ---------------------------------------------------------
+class Billing {
+public:
+    virtual long calculate(int seats, long ratePerCity, int days, long hotelCost, long returnTicketCost) = 0; 
+    virtual ~Billing() {} 
+};
+
+class EconomyBilling : public Billing {
+public:
+    long calculate(int seats, long ratePerCity, int days, long hotelCost, long returnTicketCost) override {
+        return (seats * ratePerCity * days) + (hotelCost * days) + (returnTicketCost * seats);
+    }
+    ~EconomyBilling() override {} 
+};
+
+class LuxuryBilling : public Billing {
+public:
+    long calculate(int seats, long ratePerCity, int days, long hotelCost, long returnTicketCost) override {
+        return (seats * ratePerCity * days) + (hotelCost * days) + (returnTicketCost * seats);
+    }
+    ~LuxuryBilling() override {} 
+};
+
+// ---------------------------------------------------------
+// TOURIST CLASS
+// ---------------------------------------------------------
+class Tourist : public Person {
+public:
+    string trackingID, selectedCities, spots, transportMode, vehicleType, hotelType, hotelName, allocatedRoom, passportNo;
+    string localCurrencySign, tourType;
+    string hasReturnTicket, returnDate, returnTime;
+    double currencyExchangeRate;
+    int seats, tourDays;
+    long totalBill;
+
+    Tourist() : Person(), totalBill(0), seats(0), tourDays(0), currencyExchangeRate(1.0), localCurrencySign("PKR"), tourType("Domestic"), hasReturnTicket("No"), returnDate("N/A"), returnTime("N/A") {}
+    ~Tourist() override {} 
+
+    friend ostream& operator<<(ostream& output, const Tourist& t) {
+        output << "ID: " << t.trackingID << " | Type: " << t.tourType << " | Name: " << t.name 
+               << " | Route: " << t.selectedCities << " | Return Ticket: " << t.hasReturnTicket 
+               << " | Total Bill: PKR " << t.totalBill;
+        return output;
+    }
+};
+
+// ---------------------------------------------------------
+// MAIN ENGINE CLASS
+// ---------------------------------------------------------
+class TourismEngine {
+private:
+    Driver drivers[6];
+    string companyName = "Indus Horizons Travel & Tours Ltd.";
+    string ownerName = "Salar Sikandar", ownerCNIC = "35202-1234567-1", ownerPhone = "0310-9988776", ownerAddress = "Main Corporate Plaza, Gulberg, Lahore";
+    Billing* billEngine; 
+    const long USD_TO_PKR = 278; 
+
+public:
+    TourismEngine() {
+        billEngine = nullptr; 
+        drivers[0] = Driver("Captain Qais", "3310210000011", "03001111111", "Emirates Flight / Coaster-01", "Air-901", "4.9", "Main Branch Office", "Asim Khan", "0321-4567891");
+        drivers[1] = Driver("Wajdan Mustafa", "3310220000022", "03002222222", "EuroRail / Prado-02", "Train-902", "4.8", "Northern Hub Office", "Zubair Ali", "0321-4567892");
+        drivers[2] = Driver("Faris Wajdan", "3310230000033", "03003333333", "Haramain Express / Cabin-03", "Train-903", "5.0", "Capital Hub Office", "Kamran Shah", "0321-4567893");
+        drivers[3] = Driver("Jahan Sikandar", "3310240000044", "03004444444", "Turkish Jet / Cruiser-04", "Air-904", "4.7", "Airport Terminal Branch", "Bilal Ahmed", "0321-4567894");
+        drivers[4] = Driver("Umer Hayat", "3310250000055", "03005555555", "Volvo Luxury Bus / Van-05", "Bus-905", "4.6", "Coastal Station Office", "Sajid Mahmood", "0321-4567895");
+        drivers[5] = Driver("Faris Ghazi", "3310260000066", "03006666666", "Qatar Airways / Jeep-06", "Air-906", "4.9", "Head Office Terminal", "Noman Tariq", "0321-4567896");
+    }
+
+    ~TourismEngine() {
+        if (billEngine != nullptr) {
+            delete billEngine;
+            billEngine = nullptr;
+        }
+    }
+
+    void showIntro() {
+        system("cls");
+        setColor(11); // Bright Blue
+        for(int i=0; i<8; i++) cout << endl;
+        printMid("========================================================================");
+        printMid("            INDUS HORIZONS TRAVELS & TOURS MANAGEMENT SYSTEM            ");
+        printMid("========================================================================");
+        cout << endl;
+        setColor(14); // Yellow
+        printMid("Press ANY KEY to see Team and University Details...");
+        getch();
+
+        system("cls");
+        setColor(10); // Light Green
+        for(int i=0; i<4; i++) cout << endl;
+        printMid("----------------------------------------------------------------");
+        printMid("                      PROJECT TEAM MEMBERS                      ");
+        printMid("----------------------------------------------------------------");
+        setColor(14); // Yellow/Gold for Names
+        printMid("Nisa Fatima    (253495)");
+      
+    
+        cout << endl;
+        setColor(15); // White
+    
+        printMid("UNIVERSITY: GC University Faisalabad (GCUF)");
+        printMid("DEPARTMENT: Computer Science (BSCS)");
+        setColor(10);
+        printMid("----------------------------------------------------------------");
+        getch();
+    }
+
+    void startBooking() {
+        Tourist t; 
+        system("cls");
+        setColor(13); 
+        string facilities = "None";
+        vector<string> history; 
+        int dChoice, travelType, hotelChoice, transChoice, typeChoice;
+        long ratePerSeat = 0, hotelCostPerNight = 0, returnTicketCost = 0;
+        char addMore, returnAns;
+        
+        cout << "=========================================\n";
+        cout << "         SELECT TOUR TYPE CATEGORY       \n";
+        cout << "=========================================\n";
+        cout << "1. Pakistan Tour (Domestic)\n";
+        cout << "2. Abroad Tour (International)\n";
+        cout << "Enter Choice (1-2): "; cin >> typeChoice;
+        cin.ignore();
+
+        if(typeChoice == 2) {
+            t.tourType = "International";
+        } else {
+            t.tourType = "Domestic";
+        }
+
+        system("cls");
+        setColor(11);
+        cout << ">>> START NEW " << (t.tourType == "International" ? "INTERNATIONAL" : "DOMESTIC") << " BOOKING <<<\n\n";
+        while(true) {
+            cout << "Enter unique Tracking ID (Numbers only): "; getline(cin, t.trackingID);
+            if(!isOnlyDigits(t.trackingID)) cout << "[Error] Use numbers only!\n";
+            else if(checkDuplicateID(t.trackingID)) cout << "[Error] This ID already exists!\n";
+            else break;
+        }
+        
+        cout << "Passenger Full Name: "; getline(cin, t.name);
+        
+        // --- Passport length validation (7 digits check) ---
+        if(t.tourType == "International") {
+            while(true) {
+                cout << "Passport Number (Must be exactly 7 characters): "; getline(cin, t.passportNo);
+                if(t.passportNo.length() == 7) break;
+                cout << "[Error! Passport must be exactly 7 characters long]\n";
+            }
+        } else {
+            t.passportNo = "LOCAL-TOUR";
+        }
+
+        while(true) {
+            cout << "CNIC Number (Must be 13 Digits): "; getline(cin, t.cnic);
+            if(t.cnic.length() == 13 && isOnlyDigits(t.cnic)) break;
+            cout << "[Error! CNIC must be exactly 13 digits]\n";
+        }
+        while(true) {
+            cout << "Contact Phone Number (Must be 11 Digits): "; getline(cin, t.phone);
+            if(t.phone.length() == 11 && isOnlyDigits(t.phone)) break;
+            cout << "[Error! Phone number must be exactly 11 digits]\n";
+        }
+        cout << "Number of Seats (Passengers): "; cin >> t.seats;
+        cout << "Enter Tour Duration (Total Days): "; cin >> t.tourDays;
+
+        if(t.tourType == "International") {
+            cout << "\nDo you want to book a Return Ticket back to Pakistan? (y/n): ";
+            cin >> returnAns;
+            cin.ignore();
+            if(returnAns == 'y' || returnAns == 'Y') {
+                t.hasReturnTicket = "Yes (Round-Trip)";
+                returnTicketCost = 95000; 
+                cout << "Enter Return Flight Date (DD-MM-YYYY): "; getline(cin, t.returnDate);
+                cout << "Enter Return Flight Time (e.g., 04:30 PM): "; getline(cin, t.returnTime);
+                cout << "[Success] Return ticket details saved.\n";
+            } else {
+                t.hasReturnTicket = "No (One-Way)";
+                t.returnDate = "N/A";
+                t.returnTime = "N/A";
+            }
+        } else {
+            t.hasReturnTicket = "N/A";
+            t.returnDate = "N/A";
+            t.returnTime = "N/A";
+        }
+
+        // --- Transport Selection ---
+        system("cls");
+        setColor(14);
+        long transportMultiplier = 0;
+
+        if(t.tourType == "International") {
+            cout << "--- SELECT TRANSPORT MODE ---\n";
+            cout << "1. Airways (Aeroplane Flight)\n";
+            cout << "2. Railway (Fast Bullet Train)\n";
+            cout << "3. Luxury Bus (International Route)\n";
+            cout << "Enter choice: "; cin >> transChoice;
+            if (transChoice == 1) {
+                t.transportMode = "Airways Flight"; t.vehicleType = "Boeing 777"; transportMultiplier = 85000; 
+            } else if (transChoice == 2) {
+                t.transportMode = "Bullet Train"; t.vehicleType = "High-Speed Train"; transportMultiplier = 55000;
+            } else {
+                t.transportMode = "Luxury Bus"; t.vehicleType = "Volvo Inter-City"; transportMultiplier = 35000;
+            }
+        } else {
+            cout << "--- SELECT TRANSPORT MODE ---\n";
+            cout << "1. Saloon Coaster (For families)\n";
+            cout << "2. Luxury Prado Cruiser (For elite groups)\n";
+            cout << "3. Standard High-Roof Van (Economy choice)\n";
+            cout << "Enter choice: "; cin >> transChoice;
+            if (transChoice == 1) {
+                t.transportMode = "Saloon Coaster"; t.vehicleType = "Toyota Coaster"; transportMultiplier = 15000; 
+            } else if (transChoice == 2) {
+                t.transportMode = "Luxury SUV"; t.vehicleType = "Toyota Prado 4x4"; transportMultiplier = 25000;
+            } else {
+                t.transportMode = "Standard High-Roof"; t.vehicleType = "Hiace Grand Cabin"; transportMultiplier = 10000;
+            }
+        }
+
+        // --- Hotel Selection ---
+        system("cls");
+        setColor(11);
+        cout << "--- SELECT HOTEL STAY ---\n";
+        if(t.tourType == "International") {
+            cout << "1. 3-Star Hotel (Rs. 15,000 per Night)\n";
+            cout << "2. 5-Star Luxury Resort (Rs. 45,000 per Night)\n";
+        } else {
+            cout << "1. Standard Guest Lodge (Rs. 6,000 per Night)\n";
+            cout << "2. Luxury Hotel Stay (Rs. 25,000 per Night)\n";
+        }
+        cout << "3. No Hotel Room Needed\n";
+        cout << "Enter choice: "; cin >> hotelChoice;
+        
+        int generatedRoomNo = 200 + (stoi(t.trackingID.empty() ? "1" : t.trackingID) % 600); 
+
+        if(hotelChoice == 1) {
+            hotelCostPerNight = (t.tourType == "International") ? 15000 : 6000;
+            t.hotelType = "Standard Hotel";
+            t.hotelName = (t.tourType == "International") ? "Grand Continental Hotel" : "Pine Top Lodge";
+            t.allocatedRoom = "Room No " + to_string(generatedRoomNo);
+        } else if(hotelChoice == 2) {
+            hotelCostPerNight = (t.tourType == "International") ? 45000 : 25000;
+            t.hotelType = "VIP Luxury Stay";
+            t.hotelName = (t.tourType == "International") ? "The Royal Atlantis Resort" : "Serena Luxury Resort";
+            t.allocatedRoom = "VIP Suite " + to_string(generatedRoomNo);
+        } else {
+            hotelCostPerNight = 0;
+            t.hotelType = "No Hotel";
+            t.hotelName = "N/A";
+            t.allocatedRoom = "No Room Assigned";
+        }
+
+        system("cls");
+        setColor(14); 
+        cout << "--- SELECT TRAVEL CLASS PLAN ---\n";
+        cout << "1. Standard Economy Plan\n";
+        cout << "2. Premium VIP Luxury Plan (VIP Comfort, Free Wi-Fi)\n";
+        cout << "Enter choice: "; cin >> travelType;
+
+        long baseRatePerCity = (t.tourType == "International" ? 45000 : 12000) + transportMultiplier; 
+
+        if (billEngine != nullptr) { delete billEngine; billEngine = nullptr; }
+
+        if(travelType == 2) {
+            baseRatePerCity += (t.tourType == "International" ? 50000 : 15000); 
+            t.transportMode += " [VIP Class]";
+            facilities = "VIP Lounge, Personal Tour Guide, Free Wi-Fi";
+            billEngine = new LuxuryBilling(); 
+        } else {
+            t.transportMode += " [Economy Class]";
+            facilities = "Standard Meals & Basic Services Included";
+            billEngine = new EconomyBilling(); 
+        }
+
+        // --- Destinations List ---
+        string domesticCities[] = {
+            "Kalam (Swat)", "Hunza Valley", "Murree Hills", "Skardu (Baltistan)", "Swat Valley",
+            "Naran Kaghan", "Kumrat Valley", "Neelum Valley", "Chitral Valley", "Fairy Meadows",
+            "Lahore", "Karachi", "Chiniot", "Faisalabad"
+        };
+        
+        string domesticSpots[14][6] = {
+            {"Ushu Forest", "Mahodand Lake", "Matiltan Waterfall", "Blue Water", "Boyun Top", "Kalam Bazar"},
+            {"Baltit Fort", "Altit Fort", "Attabad Lake", "Eagle Nest", "Passu Cones", "Karimabad Bazar"},
+            {"Mall Road", "Pindi Point Chairlift", "Kashmir Point", "Patriata Chairlift", "Ayubia Park", "Bhurban"},
+            {"Shangrila Lake", "Upper Kachura Lake", "Shigar Fort", "Cold Desert", "Sadpara Lake", "Manthoka Waterfall"},
+            {"Fizagat Park", "Madyan Trout Farm", "Behrain River Side", "White Palace", "Malam Jabba", "Swat Museum"},
+            {"Saif-ul-Malook Lake", "Ansoo Lake", "Lulu Sar Lake", "Babusar Top", "Kiwai Waterfalls", "Shogran"},
+            {"Kumrat Waterfall", "Jahaz Banda", "Katora Lake", "Panjkora River Side", "Wooden Canals", "Badgoi Top"},
+            {"Sharda Peeth Ruins", "Kutton Waterfall", "Keran Border Point", "Kel Cable Car", "Arrang Kel", "Taobut Valley"},
+            {"Chitral Fort", "Kalash Valley", "Bomboret Village", "Tirich Mir View", "Garam Chashma", "Shahi Masjid"},
+            {"Raikot Bridge", "Tato Village", "Fairy Meadows Camp", "Reflection Lake", "Nanga Parbat Base", "Beyal Camp"},
+            {"Badshahi Mosque", "Minar-e-Pakistan", "Lahore Fort", "Shalimar Gardens", "Wagah Border", "Anarkali Food Street"},
+            {"Clifton Beach", "Mazar-e-Quaid", "Mohatta Palace", "Maritime Museum", "Hawksbay Beach", "Port Grand Hub"},
+            {"Shahi Masjid Chiniot", "Omar Hayat Mahal", "Chenab Boating Point", "Wooden Craft Hub", "Ancient Hills Site", "Furniture Market"},
+            {"Clock Tower (Ghanta Ghar)", "D-Ground Market", "Gatwala Park", "Lyallpur Museum", "Canal Road Walk", "Chenab Club"}
+        };
+
+        string intlCities[] = {
+            "Saudi Arabia", "Dubai", "Europe", "Korea", "Turkey",
+            "Maldives", "Egypt", "Japan", "Azerbaijan", "Malaysia",
+            "London", "Manchester", "Iran", "Iraq"
+        };
+
+        string currencySigns[] = {"SAR", "AED", "EUR", "KRW", "TRY", "MVR", "EGP", "JPY", "AZN", "MYR", "GBP", "GBP", "IRR", "IQD"};
+        double exchangeRatesToPKR[] = {74.1, 75.6, 298.9, 0.21, 8.6, 18.1, 5.75, 1.78, 163.5, 59.2, 351.4, 351.4, 0.0066, 0.21};
+
+        int count = 0;
+        int maxCities = 14;
+
+        do {
+            bool alreadyExists;
+            do {
+                alreadyExists = false;
+                system("cls");
+                setColor(11); 
+                cout << "--- SELECT YOUR TOUR PLACE (MAX 3) " << (count+1) << " ---\n";
+                for(int i = 0; i < maxCities; i++) {
+                    if(t.tourType == "International") {
+                        cout << i+1 << ". " << intlCities[i] << " (Currency: " << currencySigns[i] << ")\n";
+                    } else {
+                        cout << i+1 << ". " << domesticCities[i] << " (Currency: PKR)\n";
+                    }
+                }
+                cout << "Enter choice number: "; cin >> dChoice;
+
+                string currentCity = (t.tourType == "International") ? intlCities[dChoice-1] : domesticCities[dChoice-1];
+                for(string s : history) {
+                    if(s == currentCity) { alreadyExists = true; break; }
+                }
+
+                if(alreadyExists) {
+                    setColor(12);
+                    cout << "\n[Error] Already selected " << currentCity << "!\n";
+                    getch();
+                } else {
+                    history.push_back(currentCity);
+                    t.selectedCities += currentCity + " -> ";
+                    
+                    if(t.tourType == "International") {
+                        t.localCurrencySign = currencySigns[dChoice-1];
+                        t.currencyExchangeRate = exchangeRatesToPKR[dChoice-1];
+                    } else {
+                        t.localCurrencySign = "PKR";
+                        t.currencyExchangeRate = 1.0;
+                    }
+                }
+            } while(alreadyExists);
+
+            ratePerSeat += baseRatePerCity;
+
+            system("cls");
+            if(t.tourType == "Domestic") {
+                setColor(10); 
+                cout << ">>> VISITING SPOTS LOCKED FOR: " << domesticCities[dChoice-1] << " <<<\n";
+                for(int i=0; i<6; i++) {
+                    cout << "   -> " << domesticSpots[dChoice-1][i] << " [Included]\n";
+                    t.spots += domesticSpots[dChoice-1][i] + " | "; 
+                }
+                getch();
+            } else {
+                setColor(10);
+                cout << ">>> INTERNATIONAL LINK SUCCESSFUL FOR: " << intlCities[dChoice-1] << " <<<\n\n";
+                cout << " -> Note: Company drops passengers at the destination hotel.\n";
+                cout << " -> Local city tour will be Self-Guided (by your own choice).\n";
+                t.spots = "Self-Guided Mode (No Fixed Spots Displayed)";
+                getch();
+            }
+            
+            cout << "\nDo you want to add another city/country to your route? (y/n): "; 
+            cin >> addMore;
+            count++;
+        } while((addMore == 'y' || addMore == 'Y') && count < 3);
+
+        system("cls");
+        setColor(14); 
+        cout << "--- SAVING DATA TO DATABASE ---\n";
+        cout << "[System] Checking CNIC and Passport numbers...\n"; Sleep(400);
+        cout << "[System] Checking Hotel Room availability...\n"; Sleep(400);
+        
+        int autoDriverIndex = (t.seats + t.tourDays) % 6; 
+        Driver& d = drivers[autoDriverIndex]; 
+        
+        t.totalBill = billEngine->calculate(t.seats, ratePerSeat, t.tourDays, hotelCostPerNight, returnTicketCost);
+
+        cout << "\n[Success] Done! Press any key to see the clean Receipt...";
+        getch();
+
+        // ---------------------------------------------------------
+        // CLEAN & EASY OFFICIAL INVOICE RECEIPT
+        // ---------------------------------------------------------
+        system("cls");
+        setColor(11);
+        printMid("=================================================================================");
+        setColor(15);
+        printMid("                          OFFICIAL TOUR INVOICE RECEIPT                          ");
+        setColor(11);
+        printMid("=================================================================================");
+        
+        setColor(7);
+        cout << "  Company Name   : " << companyName << endl;
+        cout << "  Head Office    : " << ownerAddress << " | NTN: " << ownerCNIC << endl;
+        cout << "  Helpline       : " << ownerPhone << endl;
+        cout << "---------------------------------------------------------------------------------" << endl;
+        
+        // PAGE 1 DETAILS
+        setColor(14);
+        cout << "  [PART 1: CUSTOMER & HOTEL STAY DETAILS]" << endl;
+        setColor(15);
+        cout << "  * Customer Name  : " << t.name << endl;
+        cout << "  * Tracking ID    : " << t.trackingID << "      |  CNIC Number : " << t.cnic << endl;
+        if(t.tourType == "International") {
+            cout << "  * Passport No    : " << t.passportNo << " (Verified)" << endl;
+        }
+        cout << "  * Tour Type      : " << t.tourType << "      |  Total Days  : " << t.tourDays << " Days" << endl;
+        cout << "  * Seats Booked   : " << t.seats << " Passenger(s)" << endl;
+        cout << "  * Hotel Name     : " << t.hotelName << " (" << t.allocatedRoom << ")" << endl;
+        cout << "  * Hotel Type     : " << t.hotelType << endl;
+
+        // PAGE 2 DETAILS (SCROLL)
+        cout << "\n---------------------------------------------------------------------------------" << endl;
+        setColor(14);
+        cout << "  [PART 2: ROUTE, DRIVER & CONDUCTOR DETAILS]" << endl;
+        setColor(15);
+        cout << "  * Selected Route : " << t.selectedCities << "END" << endl;
+        cout << "  * Transport Mode : " << t.transportMode << " (" << t.vehicleType << ")" << endl;
+        
+        // --- DRIVER AND CONDUCTOR DIRECTORY ---
+        cout << "  * Assigned Driver: " << d.name << " (License: " << d.license << ") | Rating: " << d.rating << "/5" << endl;
+        cout << "  * Conductor Name : " << d.conductorName << "      | Conductor Phone  : " << d.conductorPhone << endl;
+        
+        if(t.tourType == "Domestic") {
+            cout << "  * Visiting Spots : " << t.spots << endl;
+        } else {
+            cout << "  * Tourist Spots  : " << t.spots << endl;
+            cout << "  * Return Ticket  : " << t.hasReturnTicket << endl;
+            if(returnAns == 'y' || returnAns == 'Y') {
+                cout << "  * Return Flight  : Date: " << t.returnDate << " | Time: " << t.returnTime << endl;
+            }
+        }
+        cout << "  * Extra Services : " << facilities << endl;
+
+        // FINAL BILLING
+        cout << "---------------------------------------------------------------------------------" << endl;
+        setColor(10);
+        cout << "  TOTAL PAYABLE AMOUNT (PKR) : Rs. " << t.totalBill << " /- Only" << endl;
+        if(t.tourType == "International") {
+            long billInUSD = t.totalBill / USD_TO_PKR;
+            long billInLocalDestCurrency = t.totalBill / t.currencyExchangeRate;
+            cout << "  TOTAL BILL IN US DOLLARS   : USD $" << billInUSD << endl;
+            cout << "  LOCAL CURRENCY ESTIMATE    : " << t.localCurrencySign << " " << billInLocalDestCurrency << endl;
+        }
+        setColor(11);
+        printMid("=================================================================================");
+        
+        ofstream file("tourist_database.txt", ios::app);
+        file << t << endl; 
+        file.close();
+        
+        // SIMULATION
+        cout << "\n";
+        setColor(13);
+        printMid(">> TOUR JOURNEY STARTED <<");
+        setColor(14);
+        cout << "  Traveling smoothly with Driver " << d.name << " and Conductor " << d.conductorName << "...\n"; 
+        Sleep(1200);
+        setColor(10);
+        cout << "  [Update] Tour finished successfully! Safe logs saved to text file.\n\n";
+        
+        setColor(14);
+        char rateChoice;
+        cout << "Do you want to rate your Driver " << d.name << "? (y/n): ";
+        cin >> rateChoice;
+        if(rateChoice == 'y' || rateChoice == 'Y') {
+            int stars;
+            cout << "Give Stars (1 to 5): "; cin >> stars;
+            if(stars >= 1 && stars <= 5) {
+                d.rating = to_string(stars) + ".0/5";
+                setColor(10);
+                cout << "[Success] Driver rating updated!\n";
+            }
+        }
+        
+        setColor(15);
+        cout << "\nPress any key to go back to Main Menu...";
+        getch(); cin.ignore();
+    }
+
+    void budgetAdvisor() {
+        system("cls");
+        setColor(14);
+        double b;
+        int choice;
+        char bookChoice;
+        
+        cout << "=========================================\n";
+        cout << "          DYNAMIC BUDGET ADVISOR         \n";
+        cout << "=========================================\n";
+        cout << "1. Check Budget for Pakistan Tour (Domestic)\n";
+        cout << "2. Check Budget for Abroad Tour (International)\n";
+        cout << "Enter choice (1-2): "; cin >> choice;
+        
+        cout << "Enter your total Budget in PKR: Rs."; cin >> b;
+        
+        bool possible = true;
+
+        if (choice == 1) {
+            if (b < 10000) {
+                setColor(12);
+                cout << "\n[Note] Budget too low for Pakistan tours. Minimum Rs. 10,000 required.\n";
+                possible = false;
+            } else if (b < 40000) {
+                setColor(10);
+                cout << "\n>>> PAKISTAN ECONOMY PLAN AVAILABLE <<<\n- High-Roof Van transport.\n- Standard local guest house stay.\n";
+            } else {
+                setColor(13);
+                cout << "\n>>> PAKISTAN VIP LUXURY PLAN AVAILABLE <<<\n- Luxury Prado SUV 4x4 cruiser rides.\n- VIP Stays at PC or Serena Hotels.\n";
+            }
+        } else {
+            if (b < 100000) {
+                setColor(12);
+                cout << "\n[Note] Budget too low for abroad tours. Minimum Rs. 100,000 (1 Lac) required.\n";
+                possible = false;
+            } else if (b < 400000) {
+                setColor(11);
+                cout << "\n>>> ABROAD ECONOMY PLAN AVAILABLE <<<\n- Standard aeroplane flight tickets.\n- 3-Star Continental Hotel setup.\n";
+            } else {
+                setColor(13);
+                cout << "\n>>> ABROAD ULTRA LUXURY EXECUTIVE PLAN AVAILABLE <<<\n- First Class Flights, VIP Lounges, 5-Star Luxury Resorts.\n";
+            }
+        }
+
+        if(possible) {
+            setColor(14);
+            cout << "\nDo you want to proceed to the booking desk with this plan? (y/n): "; cin >> bookChoice;
+            cin.ignore();
+            if(bookChoice == 'y' || bookChoice == 'Y') startBooking();
+        } else {
+            getch(); cin.ignore();
+        }
+    }
+
+    void viewRecords() {
+        system("cls");
+        setColor(11);
+        ifstream f("tourist_database.txt");
+        string s;
+        cout << "--- VIEW ALL BOOKING HISTORY DATABASE ---\n";
+        setColor(15);
+        if(!f) cout << "No previous records found.\n";
+        else while(getline(f, s)) cout << s << endl;
+        f.close();
+        getch();
+    }
+
+    void deleteRecord() {
+        system("cls");
+        setColor(12);
+        string id, line; vector<string> v;
+        cout << "Enter Booking Tracking ID to cancel: "; cin >> id;
+        ifstream f("tourist_database.txt");
+        bool found = false;
+        while(getline(f, line)) {
+            if(line.find("ID: " + id + " |") == string::npos) v.push_back(line);
+            else found = true;
+        }
+        f.close();
+        if(found) {
+            ofstream f2("tourist_database.txt");
+            for(auto const& l : v) f2 << l << endl;
+            f2.close();
+            cout << "Booking cancelled successfully.";
+        } else cout << "Tracking ID not found in records.";
+        getch(); cin.ignore();
+    }
+
+    void currencyAnalyzer() {
+        system("cls");
+        setColor(11);
+        printMid("=========================================================================");
+        printMid("                       GLOBAL CURRENCY RATE CHART                        ");
+        printMid("=========================================================================");
+        setColor(14);
+        cout << "Current Currency Rates (Value of 1 Foreign Unit in Pakistani PKR):\n\n";
+        setColor(15);
+        cout << "  1. Saudi Arabia (SAR)                :  74.10 PKR\n";
+        cout << "  2. Dubai (AED)                       :  75.60 PKR\n";
+        cout << "  3. Europe (EUR)                      : 298.90 PKR\n";
+        cout << "  4. Korea (KRW)                       :   0.21 PKR\n";
+        cout << "  5. Turkey (TRY)                      :   8.60 PKR\n";
+        cout << "  6. Maldives (MVR)                    :  18.10 PKR\n";
+        cout << "  7. Egypt (EGP)                       :   5.75 PKR\n";
+        cout << "  8. Japan (JPY)                       :   1.78 PKR\n";
+        cout << "  9. Azerbaijan (AZN)                  : 163.50 PKR\n";
+        cout << " 10. Malaysia (MYR)                    :  59.20 PKR\n";
+        cout << " 11. London / Manchester (GBP)         : 351.40 PKR\n";
+        cout << " 12. Iran (IRR)                        : 0.0066 PKR\n";
+        cout << " 13. Iraq (IQD)                        :   0.21 PKR\n";
+        setColor(11);
+        cout << "-------------------------------------------------------------------------\n";
+        setColor(10);
+        cout << "[Update] All flights and routes are open and working perfectly.\n";
+        setColor(11);
+        printMid("=========================================================================");
+        cout << "\nPress any key to return to Main Menu...";
+        getch();
+    }
+};
+
+int main() {
+    TourismEngine agency;
+    agency.showIntro();
+    int ch;
+    while(true) {
+        system("cls");
+        setColor(11);
+        printMid("*********************************************************************************");
+        printMid("                      TOUR AND TRAVEL MANAGEMENT DASHBOARD                       ");
+        printMid("*********************************************************************************");
+        setColor(15);
+        cout << "1. Book a New Travel Package (Domestic / International)\n";
+        cout << "2. Check Budget Travel Advisor\n";
+        cout << "3. View All Saved Booking Records\n";
+        cout << "4. Cancel/Delete a Booking Record\n";
+        cout << "5. Check Global Currency Rates Chart\n";
+        cout << "6. Close and Exit System\n\n";
+        setColor(11);
+        cout << "Enter your choice (1-6): "; 
+        cin >> ch; cin.ignore();
+        
+        if(ch == 6) break;
+        switch(ch) {
+            case 1: agency.startBooking(); break;
+            case 2: agency.budgetAdvisor(); break;
+            case 3: agency.viewRecords(); break;
+            case 4: agency.deleteRecord(); break;
+            case 5: agency.currencyAnalyzer(); break;
+            default: setColor(12); cout << "Invalid choice! Try again."; getch();
+        }
+    }
+    return 0;
+}
